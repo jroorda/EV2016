@@ -151,7 +151,7 @@ void loop() {
   //Accelleration Stage
   wheelCounts = myEnc.read();
   while (wheelCounts < 2000) {
-    motSpeed = 100 + wheelCounts / 14 ;
+    motSpeed = 100 + wheelCounts / 8 ;
     constrain(motSpeed, 0, 255);
     updateMotorSpeed(motSpeed, backward);
     wheelCounts = myEnc.read();
@@ -167,8 +167,8 @@ void loop() {
     }
   }
 
-  //Run Stage2
-  updateMotorSpeed(100, backward);
+  //Approach Stage
+  updateMotorSpeed(30, backward);
   while ((wheelCounts + 2000) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
@@ -177,7 +177,7 @@ void loop() {
     }
   }
 
-  //Run Stage 3
+  //Final Approach
   updateMotorSpeed(30, backward);
   while ((wheelCounts + 200) < counts) {
     wheelCounts = myEnc.read();
@@ -189,19 +189,20 @@ void loop() {
 
   //Wait Stage
   updateMotorSpeed(0, backward);
-  delay(2000);
+  delay(1000);
 
   //Final Stage
   while (true) {
     wheelCounts = myEnc.read();
     error = counts - wheelCounts;
-    motSpeed = error * 4;
-    motSpeed = constrain(error, -100, 100);
-    if (motSpeed < 0) {
-      backward = true;
-      motSpeed = abs(motSpeed);
-    } else {
+    if(error > 8){
+      motSpeed = 30;
       backward = false;
+    } else if(error < -8){
+      motSpeed = 30;
+      backward = true;
+    } else {
+      motSpeed = 0;
     }
     updateMotorSpeed(motSpeed, backward);
     if (digitalRead(startButton)) {
