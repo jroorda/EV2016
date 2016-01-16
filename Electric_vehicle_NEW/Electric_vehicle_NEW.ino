@@ -1,3 +1,5 @@
+#include <Encoder.h>
+
 
 // 4133 wheel counts per meter
 // wheelCounts is the real number of  counts traveled
@@ -14,6 +16,7 @@
 #define OLED_RESET 15
 #define Button_Pin 7
 #define Pot_Pin A0
+Encoder myEnc(2, 3);
 Adafruit_SSD1306 display(OLED_MOSI, OLED_CLK, OLED_DC, OLED_RESET, OLED_CS);
 
 
@@ -52,8 +55,8 @@ char stringCounts[8];
 // end of OLED Setup
 
 
-const int encYellow = 2;
-const int encWhite = 3;
+//const int encYellow = 2;
+//const int encWhite = 3;
 const int startButton = 10;
 const int motorInA = 4;
 const int motorInB = 5;
@@ -85,14 +88,14 @@ void setup() {
   digitalWrite(Button_Pin, HIGH);
   // end OLED setup
 
-  pinMode(encYellow, INPUT);
-  pinMode(encWhite, INPUT);
+  pinMode(2, INPUT);
+  pinMode(3, INPUT);
   pinMode(startButton, INPUT);
   pinMode(motorInA, OUTPUT);
   pinMode(motorInB, OUTPUT);
   pinMode(motorpwm, OUTPUT);
-  digitalWrite(encYellow, HIGH);
-  digitalWrite(encWhite, HIGH);
+  digitalWrite(2, HIGH);
+  digitalWrite(3, HIGH);
   digitalWrite(startButton, HIGH);
   digitalWrite(motorInA, LOW);
   digitalWrite(motorInB, LOW);
@@ -101,9 +104,6 @@ void setup() {
   digitalWrite(motorInB, LOW);
   digitalWrite(motorInA, HIGH);
 
-  //Encoder Interrupts
-  attachInterrupt(0, readEncoder2, CHANGE);
-  attachInterrupt(1, readEncoder3, CHANGE);
 
   Serial.begin(115200);
   Serial.print(1);
@@ -115,6 +115,7 @@ void loop() {
   wheelCounts = 0;
   backward = false;
   error = 0;
+  myEnc.write(0);
 
   //Ready Stage
   while (true) {
@@ -148,15 +149,18 @@ void loop() {
   }
 
   //Accelleration Stage
+  wheelCounts = myEnc.read();
   while (wheelCounts < 2000) {
     motSpeed = 100 + wheelCounts / 14 ;
     constrain(motSpeed, 0, 255);
     updateMotorSpeed(motSpeed, backward);
+    wheelCounts = myEnc.read();
   }
 
   //Run Stage
   updateMotorSpeed(255, backward);
   while ((wheelCounts + 4000) < counts) {
+    wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
@@ -166,6 +170,7 @@ void loop() {
   //Run Stage2
   updateMotorSpeed(100, backward);
   while ((wheelCounts + 2000) < counts) {
+    wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
@@ -175,6 +180,7 @@ void loop() {
   //Run Stage 3
   updateMotorSpeed(30, backward);
   while ((wheelCounts + 200) < counts) {
+    wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
@@ -187,6 +193,7 @@ void loop() {
 
   //Final Stage
   while (true) {
+    wheelCounts = myEnc.read();
     error = counts - wheelCounts;
     motSpeed = error * 4;
     motSpeed = constrain(error, -100, 100);
@@ -233,37 +240,6 @@ void updateMotorSpeed(int motorSpeed, bool motorDirection) {
   analogWrite(motorpwm, motorSpeed);
 }
 
-void readEncoder2() {
-  if (digitalRead(2)) {
-    if (digitalRead(3)) {
-      wheelCounts--;
-    } else {
-      wheelCounts++;
-    }
-  } else {
-    if (digitalRead(3)) {
-      wheelCounts++;
-    } else {
-      wheelCounts--;
-    }
-  }
-}
-
-void readEncoder3() {
-  if (digitalRead(3)) {
-    if (digitalRead(2)) {
-      wheelCounts++;
-    } else {
-      wheelCounts--;
-    }
-  } else {
-    if (digitalRead(2)) {
-      wheelCounts--;
-    } else {
-      wheelCounts++;
-    }
-  }
-}
 
 
 
