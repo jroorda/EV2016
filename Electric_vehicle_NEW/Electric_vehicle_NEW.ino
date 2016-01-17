@@ -11,7 +11,7 @@
 // If using software SPI (the default case):
 #define OLED_MOSI   9
 #define OLED_CLK    8
-#define OLED_DC    16
+#define OLED_DC    16 
 #define OLED_CS    14
 #define OLED_RESET 15
 #define Button_Pin 7
@@ -50,7 +50,7 @@ static const unsigned char PROGMEM logo16_glcd_bmp[] =
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-long counts = 36000;
+long counts = 3000;
 char stringCounts[8];
 // end of OLED Setup
 
@@ -168,7 +168,7 @@ void loop() {
   }
 
   //Approach Stage
-  updateMotorSpeed(30, backward);
+  updateMotorSpeed(75, backward);
   while ((wheelCounts + 2000) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
@@ -178,7 +178,7 @@ void loop() {
   }
 
   //Final Approach
-  updateMotorSpeed(30, backward);
+  updateMotorSpeed(75, backward);
   while ((wheelCounts + 200) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
@@ -192,26 +192,60 @@ void loop() {
   delay(1000);
 
   //Final Stage
+  bool goDirection = true;
+  long targetStop = 0;
+  targetStop = setTargetStop(counts, wheelCounts);
+  if(wheelCounts > targetStop){
+    goDirection = false;
+  }
   while (true) {
     wheelCounts = myEnc.read();
-    error = counts - wheelCounts;
-    if(error > 8){
-      motSpeed = 30;
-      backward = false;
-    } else if(error < -8){
-      motSpeed = 30;
-      backward = true;
+
+    //Forwards
+    if(goDirection){
+      if(wheelCounts > targetStop){
+        updateMotorSpeed(0, false);
+        delay(500);
+        wheelCounts = myEnc.read();
+        targetStop = setTargetStop(wheelCounts, counts);
+        Serial.print(wheelCounts);
+        Serial.print(" F ");
+        Serial.println(targetStop);
+        if(wheelCounts > targetStop){
+          goDirection = false;
+        }
+        if(abs(wheelCounts - targetStop) <10){
+          break;
+        }
+      } else {
+        updateMotorSpeed(75, false);
+      }
     } else {
-      motSpeed = 0;
-    }
-    updateMotorSpeed(motSpeed, backward);
-    if (digitalRead(startButton)) {
-      wheelCounts = 0;
-      updateMotorSpeed(0, false);
-      delay(2000);
-      break;
+      //Backwards
+      if(wheelCounts < targetStop){
+        updateMotorSpeed(0, true);
+        delay(500);
+        wheelCounts = myEnc.read();
+        targetStop = setTargetStop(wheelCounts, counts);
+        Serial.print(wheelCounts);
+        Serial.print(" B ");
+        Serial.println(targetStop);
+        if(abs(wheelCounts - targetStop) < 10){
+          break;
+        }
+        if(wheelCounts < targetStop){
+          goDirection = true;
+        }
+      } else {
+        updateMotorSpeed(75, true);
+      }
     }
   }
+}
+
+long setTargetStop(long counts, long target){
+  long error = counts - target;
+  return (counts-(error/2));
 }
 
 void testdrawchar(long counts) {
