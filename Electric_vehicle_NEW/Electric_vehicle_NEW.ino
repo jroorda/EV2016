@@ -11,7 +11,7 @@
 // If using software SPI (the default case):
 #define OLED_MOSI   9
 #define OLED_CLK    8
-#define OLED_DC    16 
+#define OLED_DC    16
 #define OLED_CS    14
 #define OLED_RESET 15
 #define Button_Pin 7
@@ -50,7 +50,7 @@ static const unsigned char PROGMEM logo16_glcd_bmp[] =
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-long counts = 3000;
+long counts = 24932;
 char stringCounts[8];
 // end of OLED Setup
 
@@ -67,7 +67,12 @@ long wheelCounts;
 bool backward;
 int motSpeed;
 int error;
+long breakTime;
 
+long startTime;
+long stopTime;
+boolean startTimeSaved;
+boolean stopTimeSaved;
 
 void setup() {
   // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
@@ -104,9 +109,11 @@ void setup() {
   digitalWrite(motorInB, LOW);
   digitalWrite(motorInA, HIGH);
 
-
   Serial.begin(115200);
   Serial.print(1);
+
+  startTimeSaved = false;
+  stopTimeSaved = false;
 }
 
 void loop() {
@@ -116,6 +123,8 @@ void loop() {
   backward = false;
   error = 0;
   myEnc.write(0);
+  startTimeSaved = false;
+  stopTimeSaved = false;
 
   //Ready Stage
   while (true) {
@@ -148,73 +157,65 @@ void loop() {
     }
   }
 
-  //Accelleration Stage
-  wheelCounts = myEnc.read();
-  while (wheelCounts < 2000) {
-    motSpeed = 100 + wheelCounts / 8 ;
-    constrain(motSpeed, 0, 255);
-    updateMotorSpeed(motSpeed, backward);
-    wheelCounts = myEnc.read();
-  }
-
   //Run Stage
+  wheelCounts = myEnc.read();
   updateMotorSpeed(255, backward);
-  while ((wheelCounts + 4000) < counts) {
+  while ((wheelCounts + 1385) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
     }
+    if (!startTimeSaved) {
+      if (wheelCounts > 1385) {
+        startTime = millis();
+        startTimeSaved = true;
+      }
+    } else if (!stopTimeSaved) {
+      if (wheelCounts > 23546) {
+        stopTime = millis();
+        stopTimeSaved = true;
+      }
+    }
   }
 
+  if (!stopTimeSaved) {
+    stopTime = millis();
+  }
   //Approach Stage
-  updateMotorSpeed(75, backward);
-  while ((wheelCounts + 2000) < counts) {
-    wheelCounts = myEnc.read();
-    if (digitalRead(startButton)) {
-      wheelCounts = 0;
-      break;
-    }
-  }
+  breakTime = millis();
+  updateMotorSpeed(0, backward);
+  delay(1000);
 
-  //Final Approach
-  updateMotorSpeed(75, backward);
-  while ((wheelCounts + 200) < counts) {
-    wheelCounts = myEnc.read();
-    if (digitalRead(startButton)) {
-      wheelCounts = 0;
-      break;
-    }
-  }
+
+
 
   //Wait Stage
   updateMotorSpeed(0, backward);
   delay(1000);
+  wheelCounts = myEnc.read();
 
   //Final Stage
   bool goDirection = true;
   long targetStop = 0;
   targetStop = setTargetStop(counts, wheelCounts);
-  if(wheelCounts > targetStop){
+  if (wheelCounts > targetStop) {
     goDirection = false;
   }
   while (true) {
     wheelCounts = myEnc.read();
 
     //Forwards
-    if(goDirection){
-      if(wheelCounts > targetStop){
+    if (goDirection) {
+      if (wheelCounts > targetStop) {
         updateMotorSpeed(0, false);
         delay(500);
         wheelCounts = myEnc.read();
         targetStop = setTargetStop(wheelCounts, counts);
-        Serial.print(wheelCounts);
-        Serial.print(" F ");
-        Serial.println(targetStop);
-        if(wheelCounts > targetStop){
+        if (wheelCounts > targetStop) {
           goDirection = false;
         }
-        if(abs(wheelCounts - targetStop) <10){
+        if (abs(wheelCounts - targetStop) < 10) {
           break;
         }
       } else {
@@ -222,18 +223,15 @@ void loop() {
       }
     } else {
       //Backwards
-      if(wheelCounts < targetStop){
+      if (wheelCounts < targetStop) {
         updateMotorSpeed(0, true);
         delay(500);
         wheelCounts = myEnc.read();
         targetStop = setTargetStop(wheelCounts, counts);
-        Serial.print(wheelCounts);
-        Serial.print(" B ");
-        Serial.println(targetStop);
-        if(abs(wheelCounts - targetStop) < 10){
+        if (abs(wheelCounts - targetStop) < 10) {
           break;
         }
-        if(wheelCounts < targetStop){
+        if (wheelCounts < targetStop) {
           goDirection = true;
         }
       } else {
@@ -241,11 +239,22 @@ void loop() {
       }
     }
   }
+
+  //Display Stage
+  display.clearDisplay();
+  testdrawchar(stopTime-startTime);
+  display.display();
+  while(true){
+    if (digitalRead(startButton)) {
+      delay(500);
+      break;
+    }
+  }
 }
 
-long setTargetStop(long counts, long target){
+long setTargetStop(long counts, long target) {
   long error = counts - target;
-  return (counts-(error/2));
+  return (counts - (error / 2));
 }
 
 void testdrawchar(long counts) {
