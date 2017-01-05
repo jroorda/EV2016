@@ -1,5 +1,8 @@
 #include <Encoder.h>
 
+#define PRECOAST_DIST 2066
+#define APPROACH_SPEED 70
+#define FINAL_COAST_DIST 100
 
 // 4133 wheel counts per meter
 // wheelCounts is the real number of  counts traveled
@@ -69,11 +72,6 @@ int motSpeed;
 int error;
 long breakTime;
 
-long startTime;
-long stopTime;
-boolean startTimeSaved;
-boolean stopTimeSaved;
-
 void setup() {
   // by default, we'll generate the high voltage from the 3.3v line internally! (neat!)
   display.begin(SSD1306_SWITCHCAPVCC);
@@ -112,8 +110,6 @@ void setup() {
   Serial.begin(115200);
   Serial.print(1);
 
-  startTimeSaved = false;
-  stopTimeSaved = false;
 }
 
 void loop() {
@@ -123,8 +119,6 @@ void loop() {
   backward = false;
   error = 0;
   myEnc.write(0);
-  startTimeSaved = false;
-  stopTimeSaved = false;
 
   //Ready Stage
   while (true) {
@@ -159,91 +153,36 @@ void loop() {
 
   //Run Stage
   wheelCounts = myEnc.read();
-  updateMotorSpeed(255, backward);
-  while ((wheelCounts + 1385) < counts) {
+  updateMotorSpeed(255, false);
+  while ((wheelCounts + PRECOAST_DIST) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
     }
-    if (!startTimeSaved) {
-      if (wheelCounts > 1385) {
-        startTime = millis();
-        startTimeSaved = true;
-      }
-    } else if (!stopTimeSaved) {
-      if (wheelCounts > 23546) {
-        stopTime = millis();
-        stopTimeSaved = true;
-      }
+  }
+
+  //Coast Stage
+  breakTime = millis();
+  updateMotorSpeed(0, false);
+  delay(600);
+
+  //Approach Stage
+  wheelCounts = myEnc.read();
+  updateMotorSpeed(APPROACH_SPEED, false);
+  while ((wheelCounts + FINAL_COAST_DIST) < counts) {
+    wheelCounts = myEnc.read();
+    if (digitalRead(startButton)) {
+      wheelCounts = 0;
+      break;
     }
   }
-
-  if (!stopTimeSaved) {
-    stopTime = millis();
-  }
-  //Approach Stage
-  breakTime = millis();
-  updateMotorSpeed(0, backward);
-  delay(1000);
-
-
-
-
-  //Wait Stage
-  updateMotorSpeed(0, backward);
-  delay(1000);
-  wheelCounts = myEnc.read();
 
   //Final Stage
-  bool goDirection = true;
-  long targetStop = 0;
-  targetStop = setTargetStop(counts, wheelCounts);
-  if (wheelCounts > targetStop) {
-    goDirection = false;
-  }
-  while (true) {
-    wheelCounts = myEnc.read();
-
-    //Forwards
-    if (goDirection) {
-      if (wheelCounts > targetStop) {
-        updateMotorSpeed(0, false);
-        delay(500);
-        wheelCounts = myEnc.read();
-        targetStop = setTargetStop(wheelCounts, counts);
-        if (wheelCounts > targetStop) {
-          goDirection = false;
-        }
-        if (abs(wheelCounts - targetStop) < 10) {
-          break;
-        }
-      } else {
-        updateMotorSpeed(75, false);
-      }
-    } else {
-      //Backwards
-      if (wheelCounts < targetStop) {
-        updateMotorSpeed(0, true);
-        delay(500);
-        wheelCounts = myEnc.read();
-        targetStop = setTargetStop(wheelCounts, counts);
-        if (abs(wheelCounts - targetStop) < 10) {
-          break;
-        }
-        if (wheelCounts < targetStop) {
-          goDirection = true;
-        }
-      } else {
-        updateMotorSpeed(75, true);
-      }
-    }
-  }
+  updateMotorSpeed(0, false);
 
   //Display Stage
   display.clearDisplay();
-  testdrawchar(stopTime-startTime);
-  display.display();
   while(true){
     if (digitalRead(startButton)) {
       delay(500);
