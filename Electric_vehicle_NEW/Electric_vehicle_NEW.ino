@@ -1,8 +1,10 @@
 #include <Encoder.h>
 
 #define PRECOAST_DIST 2066
-#define APPROACH_SPEED 70
+#define APPROACH_SPEED 45
 #define FINAL_COAST_DIST 100
+#define START_DIST 6000
+//24932 old value
 
 // 4133 wheel counts per meter
 // wheelCounts is the real number of  counts traveled
@@ -14,9 +16,9 @@
 // If using software SPI (the default case):
 #define OLED_MOSI   9
 #define OLED_CLK    8
-#define OLED_DC    16
-#define OLED_CS    14
-#define OLED_RESET 15
+#define OLED_DC    A3
+#define OLED_CS    A2
+#define OLED_RESET A1
 #define Button_Pin 7
 #define Pot_Pin A0
 Encoder myEnc(2, 3);
@@ -53,7 +55,7 @@ static const unsigned char PROGMEM logo16_glcd_bmp[] =
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-long counts = 24932;
+long counts = START_DIST;
 char stringCounts[8];
 // end of OLED Setup
 
