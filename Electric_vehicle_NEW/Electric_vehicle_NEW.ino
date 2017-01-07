@@ -1,9 +1,13 @@
 #include <Encoder.h>
 
-#define PRECOAST_DIST 2066
-#define APPROACH_SPEED 45
-#define FINAL_COAST_DIST 100
-#define START_DIST 6000
+#define APPROACH_DIST 2500
+#define APPROACH_POWER 50
+#define FINAL_COAST_DIST 100 
+#define DEFAULT_DIST 24932
+
+#define BREAK_TIME 16000
+#define APPROACH_TIME 20000
+#define BREAK_POWER 90
 //24932 old value
 
 // 4133 wheel counts per meter
@@ -55,7 +59,7 @@ static const unsigned char PROGMEM logo16_glcd_bmp[] =
 #error("Height incorrect, please fix Adafruit_SSD1306.h!");
 #endif
 
-long counts = START_DIST;
+long counts = DEFAULT_DIST;
 char stringCounts[8];
 // end of OLED Setup
 
@@ -109,8 +113,8 @@ void setup() {
   digitalWrite(motorInB, LOW);
   digitalWrite(motorInA, HIGH);
 
-  Serial.begin(115200);
-  Serial.print(1);
+  Serial1.begin(115200);
+  Serial1.print(1);
 
 }
 
@@ -148,6 +152,7 @@ void loop() {
       display.display();
     }
     if (digitalRead(startButton)) {
+      Serial1.println("Start");
       delay(500);
       break;
     }
@@ -156,7 +161,7 @@ void loop() {
   //Run Stage
   wheelCounts = myEnc.read();
   updateMotorSpeed(255, false);
-  while ((wheelCounts + PRECOAST_DIST) < counts) {
+  while ((wheelCounts + APPROACH_DIST) < counts) {
     wheelCounts = myEnc.read();
     if (digitalRead(startButton)) {
       wheelCounts = 0;
@@ -164,16 +169,48 @@ void loop() {
     }
   }
 
-  //Coast Stage
-  breakTime = millis();
-  updateMotorSpeed(0, false);
-  delay(600);
-
   //Approach Stage
   wheelCounts = myEnc.read();
-  updateMotorSpeed(APPROACH_SPEED, false);
+
+  boolean reverseAllowed = true;
+  unsigned long timediff = 0;
+  unsigned long timediffTest = 0;
+  unsigned long savedtime = 0;
+  savedtime = micros();
   while ((wheelCounts + FINAL_COAST_DIST) < counts) {
     wheelCounts = myEnc.read();
+    
+    //Determine speed
+    //See if wheelCount has the correct ending bytes
+    if (!(wheelCounts & 0x0F)){
+      //Find the time difference
+      
+      timediffTest = micros()- savedtime;
+      savedtime = micros();
+      if(timediffTest > 500){
+        timediff = timediffTest;
+      }
+      Serial1.println(timediff);
+    }
+    if(micros()- savedtime > 800000){
+      timediff = micros()- savedtime;
+      savedtime = micros();
+      Serial1.println(timediff);
+    }
+
+    
+
+    if (timediff <= BREAK_TIME && reverseAllowed){
+      updateMotorSpeed(BREAK_POWER, true);
+    } else if (timediff <= APPROACH_TIME ){
+      updateMotorSpeed(0, false);
+      reverseAllowed = false;
+    } else {
+      updateMotorSpeed(APPROACH_POWER, false);
+      reverseAllowed = false;
+    }
+
+
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
