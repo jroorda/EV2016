@@ -1,19 +1,11 @@
 #include <Encoder.h>
 
-<<<<<<< HEAD
 #define APPROACH_DIST 5000
 #define APPROACH_POWER 65
 #define FINAL_COAST_DIST 100 
 #define DEFAULT_DIST 24932
 
 #define MIN_BREAK_TIME 1
-=======
-#define APPROACH_DIST 2500
-#define APPROACH_POWER 50
-#define FINAL_COAST_DIST 100 
-#define DEFAULT_DIST 24932
-
->>>>>>> origin/master
 #define BREAK_TIME 16000
 #define APPROACH_TIME 20000
 #define BREAK_POWER 90
@@ -208,7 +200,6 @@ void loop() {
     }
 
     
-<<<<<<< HEAD
     long breakStartTime = millis();
     //if (((millis() - breakStartTime) < MIN_BREAK_TIME)||(timediff <= BREAK_TIME && reverseAllowed)){
       updateMotorSpeed(BREAK_POWER, true);
@@ -219,16 +210,6 @@ void loop() {
       reverseAllowed = false;
     } else {
       updateMotorSpeed(APPROACH_POWER, true);
-=======
-
-    if (timediff <= BREAK_TIME && reverseAllowed){
-      updateMotorSpeed(BREAK_POWER, true);
-    } else if (timediff <= APPROACH_TIME ){
-      updateMotorSpeed(0, false);
-      reverseAllowed = false;
-    } else {
-      updateMotorSpeed(APPROACH_POWER, false);
->>>>>>> origin/master
       reverseAllowed = false;
     }
 
