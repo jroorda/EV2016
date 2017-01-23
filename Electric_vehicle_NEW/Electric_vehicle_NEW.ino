@@ -1,14 +1,13 @@
 #include <Encoder.h>
 
-#define APPROACH_DIST 5000
-#define APPROACH_POWER 65
-#define FINAL_COAST_DIST 100 
-#define DEFAULT_DIST 24932
+#define APPROACH_DIST 3000  //When it will start Braking
+#define APPROACH_POWER 65   //Ammount of power it uses to get going
+#define FINAL_COAST_DIST 100  //When it will turn off the motor
+#define DEFAULT_DIST 24932   //What the counter starts at
 
-#define MIN_BREAK_TIME 1
-#define BREAK_TIME 16000
-#define APPROACH_TIME 20000
-#define BREAK_POWER 90
+#define BREAK_TIME 16000    //Speed that trigger braking
+#define APPROACH_TIME 20000  //Target speed of the approach
+#define BREAK_POWER 90      //Power used to brake
 //24932 old value
 
 // 4133 wheel counts per meter
@@ -173,47 +172,83 @@ void loop() {
   //Approach Stage
   wheelCounts = myEnc.read();
 
+  boolean reverseAllowedMaster = true;
   boolean reverseAllowed = true;
+  boolean lastStateBrake = false;
   unsigned long timediff = 0;
   unsigned long timediffTest = 0;
   unsigned long savedtime = 0;
   savedtime = micros();
+  boolean onCount = false;
+  boolean firstRun = false;
+  int fastCoastCount = 0;
+
   while ((wheelCounts + FINAL_COAST_DIST) < counts) {
     wheelCounts = myEnc.read();
-    
+
     //Determine speed
     //See if wheelCount has the correct ending bytes
-    if (!(wheelCounts & 0x0F)){
+    if (!(wheelCounts & 0x0F)) {
       //Find the time difference
-      
-      timediffTest = micros()- savedtime;
-      savedtime = micros();
-      if(timediffTest > 500){
-        timediff = timediffTest;
+      if (!onCount) {
+        timediffTest = micros() - savedtime;
+        savedtime = micros();
+        if (timediffTest > 500) {
+          timediff = timediffTest;
+        }
+        onCount = true;
+        Serial1.println(timediff);
+        firstRun = true;
       }
-      Serial1.println(timediff);
+    } else {
+      onCount = false;
     }
-    if(micros()- savedtime > 800000){
-      timediff = micros()- savedtime;
+    if (micros() - savedtime > 800000) {
+      timediff = micros() - savedtime;
       savedtime = micros();
       Serial1.println(timediff);
+      firstRun = true;
     }
 
-    
-    long breakStartTime = millis();
-    //if (((millis() - breakStartTime) < MIN_BREAK_TIME)||(timediff <= BREAK_TIME && reverseAllowed)){
-      updateMotorSpeed(BREAK_POWER, true);
-      delay(500);
-      if(false){
-    } else if (timediff <= APPROACH_TIME ){
-      updateMotorSpeed(0, true);
-      reverseAllowed = false;
-    } else {
-      updateMotorSpeed(APPROACH_POWER, true);
-      reverseAllowed = false;
+    if (firstRun) {
+      //Brake
+      if (timediff <= BREAK_TIME && reverseAllowed && reverseAllowedMaster) {
+        updateMotorSpeed(BREAK_POWER, true);
+        fastCoastCount = 0;
+        lastStateBrake = true;
+        Serial1.print("B");
+      }
+
+      //Coast
+      else if (timediff <= APPROACH_TIME ) {
+        updateMotorSpeed(0, false);
+        reverseAllowed = false;
+        lastStateBrake = false;
+        if (timediff <= BREAK_TIME) {
+          if (fastCoastCount++ > 3) {
+            reverseAllowed = true;
+          }
+        }
+        Serial1.print("C");
+      }
+
+      //Power
+      else {
+        if (lastStateBrake) {
+          updateMotorSpeed(0, false);
+          reverseAllowed = false;
+          lastStateBrake = false;
+          Serial1.print("c");
+        } else {
+          updateMotorSpeed(APPROACH_POWER, false);
+          reverseAllowed = false;
+          reverseAllowedMaster = false;
+          Serial1.print("P");
+        }
+      }
     }
 
-
+    firstRun = false;
     if (digitalRead(startButton)) {
       wheelCounts = 0;
       break;
@@ -221,11 +256,14 @@ void loop() {
   }
 
   //Final Stage
-  updateMotorSpeed(0, false);
+  updateMotorSpeed(0, true);
 
   //Display Stage
   display.clearDisplay();
-  while(true){
+  while (true) {
+    wheelCounts = myEnc.read();
+    display.clearDisplay();
+    testdrawchar(wheelCounts);
     if (digitalRead(startButton)) {
       delay(500);
       break;
